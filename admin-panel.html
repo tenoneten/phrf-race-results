@@ -1,93 +1,112 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
+  <title>PHRF Race Admin Panel</title>
   <meta charset="UTF-8">
-  <title>Race Admin Panel</title>
 </head>
 <body>
-  <h1>PHRF Race Admin Panel</h1>
+  <h1>PHRF Race Results Admin Panel</h1>
 
-  <label for="distance">Race Distance (nautical miles): </label>
-  <input type="number" id="distance" step="0.01" required>
-  
-  <br><br>
+  <p>
+    Race Distance (nautical miles):
+    <input type="number" id="distance" step="0.01" min="0">
+  </p>
 
-  <table id="raceTable" border="1">
+  <table id="resultsTable" border="1">
     <thead>
       <tr>
         <th>Boat Name</th>
-        <th>PHRF</th>
-        <th>Elapsed Time (min)</th>
+        <th>PHRF Rating</th>
+        <th>Elapsed Time (MM:SS)</th>
+        <th>Action</th>
       </tr>
     </thead>
-    <tbody>
-      <tr>
-        <td><input type="text" placeholder="Boat 1"></td>
-        <td><input type="number" placeholder="e.g. 150"></td>
-        <td><input type="number" placeholder="e.g. 90"></td>
-      </tr>
+    <tbody id="resultsBody">
     </tbody>
   </table>
-  <button onclick="addRow()">Add Row</button>
-  <br><br>
+
+  <button onclick="addRow()">Add Boat</button>
   <button onclick="computeAndSave()">Compute & Save</button>
   <button onclick="publishResults()">Publish to Live Site</button>
 
-  <pre id="status"></pre>
-
   <script>
     function addRow() {
-      const table = document.getElementById("raceTable").getElementsByTagName('tbody')[0];
-      const newRow = table.insertRow();
-      for (let i = 0; i < 3; i++) {
-        const cell = newRow.insertCell();
-        const input = document.createElement("input");
-        input.type = i === 0 ? "text" : "number";
-        cell.appendChild(input);
-      }
+      const table = document.getElementById("resultsBody");
+      const row = table.insertRow();
+      row.innerHTML = `
+        <td><input type="text" class="boat-name"></td>
+        <td><input type="number" class="phrf"></td>
+        <td><input type="text" class="elapsed"></td>
+        <td><button onclick="removeRow(this)">Remove</button></td>
+      `;
+    }
+
+    function removeRow(button) {
+      const row = button.parentNode.parentNode;
+      row.parentNode.removeChild(row);
+    }
+
+    function parseTimeToSeconds(timeStr) {
+      const [minutes, seconds] = timeStr.split(":").map(Number);
+      return (minutes * 60) + seconds;
     }
 
     function computeAndSave() {
-      const rows = document.querySelectorAll("#raceTable tbody tr");
-      const distance = parseFloat(document.getElementById("distance").value);
-      if (isNaN(distance) || distance <= 0) {
-        alert("Please enter a valid race distance.");
+      const distanceInput = document.getElementById("distance");
+      const distance = parseFloat(distanceInput.value);
+      if (isNaN(distance)) {
+        alert("Please enter a valid distance.");
         return;
       }
 
+      const rows = document.querySelectorAll("#resultsBody tr");
       const results = [];
-      for (const row of rows) {
-        const [nameInput, phrfInput, timeInput] = row.querySelectorAll("input");
-        const name = nameInput.value;
-        const phrf = parseFloat(phrfInput.value);
-        const elapsed = parseFloat(timeInput.value);
 
-        if (!name || isNaN(phrf) || isNaN(elapsed)) continue;
+      rows.forEach(row => {
+        const name = row.querySelector(".boat-name").value;
+        const phrf = parseFloat(row.querySelector(".phrf").value);
+        const elapsed = row.querySelector(".elapsed").value;
 
-        const correctedTime = elapsed - (phrf * distance) / 60;
-        results.push({ name, phrf, elapsed, correctedTime });
-      }
+        if (!name || isNaN(phrf) || !elapsed.includes(":")) {
+          return;
+        }
 
+        const elapsedSec = parseTimeToSeconds(elapsed);
+        const correctedSec = elapsedSec - (phrf * distance / 60);
+        const minutes = Math.floor(correctedSec / 60);
+        const seconds = Math.round(correctedSec % 60);
+        const corrected = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+        results.push({ name, phrf, elapsed, corrected });
+      });
+
+      results.sort((a, b) => parseTimeToSeconds(a.corrected) - parseTimeToSeconds(b.corrected));
       localStorage.setItem("raceResults", JSON.stringify(results));
-      document.getElementById("status").textContent = "Results saved locally.";
+      alert("Results saved locally.");
     }
 
     async function publishResults() {
-      const data = localStorage.getItem("raceResults");
-      if (!data) {
-        alert("No results to publish.");
+      const results = localStorage.getItem("raceResults");
+      if (!results) {
+        alert("No results to publish. Compute first.");
         return;
       }
-
-      const res = await fetch("/.netlify/functions/publish", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: data
-      });
-
-      const result = await res.text();
-      document.getElementById("status").textContent = "Publish response: " + result;
+      try {
+        const response = await fetch("/.netlify/functions/publish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: results
+        });
+        if (!response.ok) throw new Error("Request failed");
+        alert("Results published.");
+      } catch (err) {
+        alert("Error publishing: " + err.message);
+      }
     }
+
+    window.onload = () => {
+      addRow();
+    };
   </script>
 </body>
 </html>
