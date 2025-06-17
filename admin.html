@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>PHRF Race Results</title>
+  <style>
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #888; padding: 8px; text-align: center; }
+    th { background: #eee; }
+  </style>
+</head>
+<body>
+  <h2>PHRF Race Results Calculator</h2>
+  <button onclick="addBoat()">➕ Add Boat</button>
+  <table id="fleet">
+    <thead>
+      <tr>
+        <th>Boat</th><th>PHRF</th><th>Elapsed (hh:mm:ss)</th>
+        <th>Distance (nm)</th><th>TOD Time</th><th>TOT Time</th><th>Rank (TOD)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Boats will be added here -->
+    </tbody>
+  </table>
+  <button onclick="computeAll()">🧮 Compute Results</button>
+
+  <script>
+    function parseHMS(s) {
+      const [h=0,m=0,s2=0] = s.split(':').map(Number);
+      return h*3600 + m*60 + s2;
+    }
+    function fmtHMS(sec) {
+      const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+      return `${h}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+    }
+    function addBoat() {
+      const tbody = document.querySelector('#fleet tbody');
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><input value="Boat${tbody.rows.length+1}"></td>
+        <td><input value="150" type="number"></td>
+        <td><input value="1:00:00"></td>
+        <td><input value="5" type="number"></td>
+        <td></td><td></td><td></td>
+      `;
+      tbody.appendChild(row);
+    }
+    function computeAll() {
+      const rows = [...document.querySelectorAll('#fleet tbody tr')];
+      const results = rows.map(row => {
+        const [name, phrf, el, dist] =
+          [...row.querySelectorAll('input')].map((i, idx) =>
+            idx === 0 ? i.value :
+            idx < 3 ? Number(i.value) || i.value :
+            Number(i.value)
+          );
+        const t = parseHMS(el);
+        const d = dist;
+        const p = Number(phrf);
+        const todT = t - (p * d);
+        const TCF = 650 / (550 + p);
+        const totT = t * TCF;
+        row.cells[4].innerText = fmtHMS(Math.max(0,Math.round(todT)));
+        row.cells[5].innerText = fmtHMS(Math.max(0,Math.round(totT)));
+        return {row, todT};
+      });
+
+      results.sort((a,b) => a.todT - b.todT);
+      results.forEach((r, i) => r.row.cells[6].innerText = `TOD #${i+1}`);
+    }
+
+    addBoat(); addBoat(); addBoat();  // preload 3 rows
+  </script>
+</body>
+</html>

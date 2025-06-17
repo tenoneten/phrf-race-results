@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>PHRF Admin Panel</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #888; padding: 8px; text-align: center; }
+    th { background: #eee; }
+    input { width: 100%; }
+    button { margin: 10px 5px; padding: 5px 10px; }
+  </style>
+</head>
+<body>
+  <h2>Admin Panel – PHRF Race Calculator</h2>
+  <button onclick="addBoat()">➕ Add Boat</button>
+  <button onclick="computeAll()">🧮 Compute & Save</button>
+  <button onclick="exportResults()">💾 Export as JSON</button>
+  <button onclick="exportResultsAndRemind()">⬆️ Publish to Live Site</button>
+
+  <table id="fleet">
+    <thead>
+      <tr>
+        <th>Boat</th><th>PHRF</th><th>Elapsed (hh:mm:ss)</th>
+        <th>Distance (nm)</th><th>TOD</th><th>TOT</th><th>Rank (TOD)</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    function parseHMS(s) {
+      const [h=0, m=0, s2=0] = s.split(':').map(Number);
+      return h * 3600 + m * 60 + s2;
+    }
+
+    function fmtHMS(sec) {
+      const h = Math.floor(sec / 3600),
+            m = Math.floor((sec % 3600) / 60),
+            s = Math.floor(sec % 60);
+      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function addBoat() {
+      const tbody = document.querySelector('#fleet tbody');
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><input value="Boat ${tbody.rows.length + 1}"></td>
+        <td><input type="number" value="150"></td>
+        <td><input value="1:00:00"></td>
+        <td><input type="number" value="5"></td>
+        <td></td><td></td><td></td>
+      `;
+      tbody.appendChild(row);
+    }
+
+    function computeAll() {
+      const rows = [...document.querySelectorAll('#fleet tbody tr')];
+      const results = rows.map(row => {
+        const [nameInput, phrfInput, elapsedInput, distInput] =
+          row.querySelectorAll('input');
+        const name = nameInput.value;
+        const phrf = parseInt(phrfInput.value);
+        const elapsedStr = elapsedInput.value;
+        const elapsed = parseHMS(elapsedStr);
+        const distance = parseFloat(distInput.value);
+
+        const todT = elapsed - (phrf * distance);
+        const TCF = 650 / (550 + phrf);
+        const totT = elapsed * TCF;
+
+        row.cells[4].innerText = fmtHMS(todT);
+        row.cells[5].innerText = fmtHMS(totT);
+
+        return {
+          name, phrf, elapsed: elapsedStr, distance,
+          todT: Math.max(0, Math.round(todT)),
+          totT: Math.max(0, Math.round(totT))
+        };
+      });
+
+      const sorted = [...results].sort((a, b) => a.todT - b.todT);
+      sorted.forEach((r, i) => {
+        const row = [...document.querySelectorAll('#fleet tbody tr')]
+          .find(tr => tr.querySelector('input').value === r.name);
+        row.cells[6].innerText = `#${i + 1}`;
+      });
+
+      localStorage.setItem("raceResults", JSON.stringify(results));
+      alert("Results calculated and saved.");
+    }
+
+    function exportResults() {
+      const rows = [...document.querySelectorAll('#fleet tbody tr')];
+      const results = rows.map(row => {
+        const [nameInput, phrfInput, elapsedInput, distInput] =
+          row.querySelectorAll('input');
+        const name = nameInput.value;
+        const phrf = parseInt(phrfInput.value);
+        const elapsedStr = elapsedInput.value;
+        const elapsed = parseHMS(elapsedStr);
+        const distance = parseFloat(distInput.value);
+
+        const todT = elapsed - (phrf * distance);
+        const TCF = 650 / (550 + phrf);
+        const totT = elapsed * TCF;
+
+        return {
+          name, phrf, elapsed: elapsedStr, distance,
+          todT: Math.max(0, Math.round(todT)),
+          totT: Math.max(0, Math.round(totT))
+        }
+    function exportResultsAndRemind() {
+  	exportResults();
+  	alert("✅ Results downloaded as results.json.\n\n📌 Now open Terminal and run:\n\n  git add results.json\n  git commit -m \"Updated results\"\n  git push\n\nto publish the updated race results.");
+}
+      });
+
+
+      const blob = new Blob([JSON.stringify(results, null, 2)], {
+        type: "application/json"
+      });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "results.json";
+      a.click();
+    }
+
+    // Preload 3 boats
+    addBoat(); addBoat(); addBoat();
+  </script>
+</body>
+</html>

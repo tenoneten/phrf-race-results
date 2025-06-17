@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>The Real Race Results Bitches</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #888; padding: 8px; text-align: center; }
+    th { background: #eee; }
+  </style>
+</head>
+<body>
+  <h2>Race Results</h2>
+  <table id="results">
+    <thead>
+      <tr>
+        <th>Boat</th><th>PHRF</th><th>Elapsed</th><th>Distance</th>
+        <th>TOD Corrected</th><th>TOT Corrected</th><th>Rank (TOD)</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    function fmtHMS(sec) {
+      const h = Math.floor(sec / 3600),
+            m = Math.floor((sec % 3600) / 60),
+            s = Math.floor(sec % 60);
+      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    async function loadResults() {
+      try {
+        const res = await fetch('results.json');
+        const data = await res.json();
+        const sorted = [...data].sort((a, b) => a.todT - b.todT);
+        const tbody = document.querySelector('#results tbody');
+        tbody.innerHTML = '';
+
+        sorted.forEach((result, index) => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${result.name}</td>
+            <td>${result.phrf}</td>
+            <td>${result.elapsed}</td>
+            <td>${result.distance}</td>
+            <td>${fmtHMS(result.todT)}</td>
+            <td>${fmtHMS(result.totT)}</td>
+            <td>#${index + 1}</td>
+          `;
+          tbody.appendChild(row);
+        });
+      } catch (e) {
+        document.querySelector('#results tbody').innerHTML =
+          '<tr><td colspan="7">Unable to load results.</td></tr>';
+      }
+    }
+
+    loadResults();
+  </script>
+</body>
+</html>
