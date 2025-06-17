@@ -1,134 +1,98 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>PHRF Admin Panel</title>
+  <title>PHRF Race Admin Panel</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-    th, td { border: 1px solid #888; padding: 8px; text-align: center; }
-    th { background: #eee; }
-    input { width: 100%; }
-    button { margin: 10px 5px; padding: 5px 10px; }
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+      background-color: #f9f9f9;
+    }
+    h1 {
+      margin-bottom: 1rem;
+    }
+    table, th, td {
+      border: 1px solid #ccc;
+      border-collapse: collapse;
+      padding: 0.5rem;
+    }
+    input {
+      width: 100px;
+    }
+    button {
+      margin: 0.5rem 0;
+    }
   </style>
 </head>
 <body>
-  <h2>Admin Panel – PHRF Race Calculator</h2>
-  <button onclick="addBoat()">➕ Add Boat</button>
-  <button onclick="computeAll()">🧮 Compute & Save</button>
-  <button onclick="exportResults()">💾 Export as JSON</button>
-  <button onclick="exportResultsAndRemind()">⬆️ Publish to Live Site</button>
-
-  <table id="fleet">
+  <h1>PHRF Race Results Admin Panel</h1>
+  <table id="boatsTable">
     <thead>
       <tr>
-        <th>Boat</th><th>PHRF</th><th>Elapsed (hh:mm:ss)</th>
-        <th>Distance (nm)</th><th>TOD</th><th>TOT</th><th>Rank (TOD)</th>
+        <th>Boat Name</th>
+        <th>PHRF</th>
+        <th>Elapsed Time (minutes)</th>
+        <th>Remove</th>
       </tr>
     </thead>
     <tbody></tbody>
   </table>
+  <button id="addBoatButton">Add Boat</button>
+  <button id="publishButton">Publish to Site</button>
 
   <script>
-    function parseHMS(s) {
-      const [h=0, m=0, s2=0] = s.split(':').map(Number);
-      return h * 3600 + m * 60 + s2;
-    }
+    const boatsTableBody = document.querySelector("#boatsTable tbody");
 
-    function fmtHMS(sec) {
-      const h = Math.floor(sec / 3600),
-            m = Math.floor((sec % 3600) / 60),
-            s = Math.floor(sec % 60);
-      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    }
-
-    function addBoat() {
-      const tbody = document.querySelector('#fleet tbody');
-      const row = document.createElement('tr');
+    function addBoatRow(name = "", phrf = "", elapsed = "") {
+      const row = document.createElement("tr");
       row.innerHTML = `
-        <td><input value="Boat ${tbody.rows.length + 1}"></td>
-        <td><input type="number" value="150"></td>
-        <td><input value="1:00:00"></td>
-        <td><input type="number" value="5"></td>
-        <td></td><td></td><td></td>
+        <td><input type="text" value="${name}" class="name"></td>
+        <td><input type="number" value="${phrf}" class="phrf"></td>
+        <td><input type="number" value="${elapsed}" class="elapsed"></td>
+        <td><button onclick="this.closest('tr').remove()">Remove</button></td>
       `;
-      tbody.appendChild(row);
+      boatsTableBody.appendChild(row);
     }
 
-    function computeAll() {
-      const rows = [...document.querySelectorAll('#fleet tbody tr')];
-      const results = rows.map(row => {
-        const [nameInput, phrfInput, elapsedInput, distInput] =
-          row.querySelectorAll('input');
-        const name = nameInput.value;
-        const phrf = parseInt(phrfInput.value);
-        const elapsedStr = elapsedInput.value;
-        const elapsed = parseHMS(elapsedStr);
-        const distance = parseFloat(distInput.value);
+    document.getElementById("addBoatButton").addEventListener("click", () => addBoatRow());
 
-        const todT = elapsed - (phrf * distance);
-        const TCF = 650 / (550 + phrf);
-        const totT = elapsed * TCF;
+    document.getElementById("publishButton").addEventListener("click", async () => {
+      const rows = boatsTableBody.querySelectorAll("tr");
+      const boats = [];
 
-        row.cells[4].innerText = fmtHMS(todT);
-        row.cells[5].innerText = fmtHMS(totT);
+      for (const row of rows) {
+        const name = row.querySelector(".name").value.trim();
+        const phrf = parseInt(row.querySelector(".phrf").value);
+        const elapsed = parseFloat(row.querySelector(".elapsed").value);
+        if (!name || isNaN(phrf) || isNaN(elapsed)) continue;
 
-        return {
-          name, phrf, elapsed: elapsedStr, distance,
-          todT: Math.max(0, Math.round(todT)),
-          totT: Math.max(0, Math.round(totT))
-        };
-      });
+        const adjusted = elapsed + (phrf * elapsed / 60 / 60); // simplified correction
+        boats.push({ name, phrf, elapsed, adjusted: adjusted.toFixed(2) });
+      }
 
-      const sorted = [...results].sort((a, b) => a.todT - b.todT);
-      sorted.forEach((r, i) => {
-        const row = [...document.querySelectorAll('#fleet tbody tr')]
-          .find(tr => tr.querySelector('input').value === r.name);
-        row.cells[6].innerText = `#${i + 1}`;
-      });
+      boats.sort((a, b) => a.adjusted - b.adjusted);
 
-      localStorage.setItem("raceResults", JSON.stringify(results));
-      alert("Results calculated and saved.");
-    }
+      localStorage.setItem("raceResults", JSON.stringify(boats));
 
-    function exportResults() {
-      const rows = [...document.querySelectorAll('#fleet tbody tr')];
-      const results = rows.map(row => {
-        const [nameInput, phrfInput, elapsedInput, distInput] =
-          row.querySelectorAll('input');
-        const name = nameInput.value;
-        const phrf = parseInt(phrfInput.value);
-        const elapsedStr = elapsedInput.value;
-        const elapsed = parseHMS(elapsedStr);
-        const distance = parseFloat(distInput.value);
+      try {
+        const response = await fetch("/.netlify/functions/publish", {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify(boats)
+        });
 
-        const todT = elapsed - (phrf * distance);
-        const TCF = 650 / (550 + phrf);
-        const totT = elapsed * TCF;
-
-        return {
-          name, phrf, elapsed: elapsedStr, distance,
-          todT: Math.max(0, Math.round(todT)),
-          totT: Math.max(0, Math.round(totT))
+        if (response.ok) {
+          alert("Race results published successfully.");
+        } else {
+          const err = await response.text();
+          alert("Error publishing: " + err);
         }
-    function exportResultsAndRemind() {
-  	exportResults();
-  	alert("✅ Results downloaded as results.json.\n\n📌 Now open Terminal and run:\n\n  git add results.json\n  git commit -m \"Updated results\"\n  git push\n\nto publish the updated race results.");
-}
-      });
-
-
-      const blob = new Blob([JSON.stringify(results, null, 2)], {
-        type: "application/json"
-      });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "results.json";
-      a.click();
-    }
-
-    // Preload 3 boats
-    addBoat(); addBoat(); addBoat();
+      } catch (err) {
+        console.error(err);
+        alert("Failed to publish results.");
+      }
+    });
   </script>
 </body>
 </html>
