@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Scooter",
+    "phrf": 110,
+    "elapsed": "1:00:00",
+    "distance": 5,
+    "todT": 3050,
+    "totT": 3545
+  },
+  {
+    "name": "Boat 2",
+    "phrf": 150,
+    "elapsed": "0:49:00",
+    "distance": 5,
+    "todT": 2190,
+    "totT": 2730
+  },
+  {
+    "name": "Boat 3",
+    "phrf": 150,
+    "elapsed": "1:00:00",
+    "distance": 5,
+    "todT": 2850,
+    "totT": 3343
+  }
+]
