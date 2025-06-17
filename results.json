@@ -1,20 +1,14 @@
 [
   {
-    "name": "Scooter",
-    "phrf": 110,
-    "elapsed": 61,
-    "adjusted": "62.86"
-  },
-  {
-    "name": "Morphine",
+    "name": "morphine",
     "phrf": 155,
-    "elapsed": 76,
-    "adjusted": "79.27"
+    "elapsed": "42:32",
+    "corrected": "42:09"
   },
   {
-    "name": "Jolly",
-    "phrf": 140,
-    "elapsed": 90,
-    "adjusted": "93.50"
+    "name": "Dingleberry",
+    "phrf": 159,
+    "elapsed": "60:00",
+    "corrected": "59:36"
   }
 ]
