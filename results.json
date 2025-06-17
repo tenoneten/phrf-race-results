@@ -1,20 +1,20 @@
 [
   {
-
     "name": "Scooter",
     "phrf": 110,
-    "elapsed": "1:00:00",
-    "distance": 5,
-    "todT": 3050,
-    "totT": 3545
+    "elapsed": 61,
+    "adjusted": "62.86"
   },
   {
-
-    "name": "Boat 3",
-    "phrf": 150,
-    "elapsed": "1:00:00",
-    "distance": 5,
-    "todT": 2850,
-    "totT": 3343
+    "name": "Morphine",
+    "phrf": 155,
+    "elapsed": 76,
+    "adjusted": "79.27"
+  },
+  {
+    "name": "Jolly",
+    "phrf": 140,
+    "elapsed": 90,
+    "adjusted": "93.50"
   }
 ]
