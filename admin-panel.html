@@ -2,97 +2,92 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>PHRF Race Admin Panel</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      padding: 2rem;
-      background-color: #f9f9f9;
-    }
-    h1 {
-      margin-bottom: 1rem;
-    }
-    table, th, td {
-      border: 1px solid #ccc;
-      border-collapse: collapse;
-      padding: 0.5rem;
-    }
-    input {
-      width: 100px;
-    }
-    button {
-      margin: 0.5rem 0;
-    }
-  </style>
+  <title>Race Admin Panel</title>
 </head>
 <body>
-  <h1>PHRF Race Results Admin Panel</h1>
-  <table id="boatsTable">
+  <h1>PHRF Race Admin Panel</h1>
+
+  <label for="distance">Race Distance (nautical miles): </label>
+  <input type="number" id="distance" step="0.01" required>
+  
+  <br><br>
+
+  <table id="raceTable" border="1">
     <thead>
       <tr>
         <th>Boat Name</th>
         <th>PHRF</th>
-        <th>Elapsed Time (minutes)</th>
-        <th>Remove</th>
+        <th>Elapsed Time (min)</th>
       </tr>
     </thead>
-    <tbody></tbody>
+    <tbody>
+      <tr>
+        <td><input type="text" placeholder="Boat 1"></td>
+        <td><input type="number" placeholder="e.g. 150"></td>
+        <td><input type="number" placeholder="e.g. 90"></td>
+      </tr>
+    </tbody>
   </table>
-  <button id="addBoatButton">Add Boat</button>
-  <button id="publishButton">Publish to Site</button>
+  <button onclick="addRow()">Add Row</button>
+  <br><br>
+  <button onclick="computeAndSave()">Compute & Save</button>
+  <button onclick="publishResults()">Publish to Live Site</button>
+
+  <pre id="status"></pre>
 
   <script>
-    const boatsTableBody = document.querySelector("#boatsTable tbody");
-
-    function addBoatRow(name = "", phrf = "", elapsed = "") {
-      const row = document.createElement("tr");
-      row.innerHTML = `
-        <td><input type="text" value="${name}" class="name"></td>
-        <td><input type="number" value="${phrf}" class="phrf"></td>
-        <td><input type="number" value="${elapsed}" class="elapsed"></td>
-        <td><button onclick="this.closest('tr').remove()">Remove</button></td>
-      `;
-      boatsTableBody.appendChild(row);
+    function addRow() {
+      const table = document.getElementById("raceTable").getElementsByTagName('tbody')[0];
+      const newRow = table.insertRow();
+      for (let i = 0; i < 3; i++) {
+        const cell = newRow.insertCell();
+        const input = document.createElement("input");
+        input.type = i === 0 ? "text" : "number";
+        cell.appendChild(input);
+      }
     }
 
-    document.getElementById("addBoatButton").addEventListener("click", () => addBoatRow());
+    function computeAndSave() {
+      const rows = document.querySelectorAll("#raceTable tbody tr");
+      const distance = parseFloat(document.getElementById("distance").value);
+      if (isNaN(distance) || distance <= 0) {
+        alert("Please enter a valid race distance.");
+        return;
+      }
 
-    document.getElementById("publishButton").addEventListener("click", async () => {
-      const rows = boatsTableBody.querySelectorAll("tr");
-      const boats = [];
-
+      const results = [];
       for (const row of rows) {
-        const name = row.querySelector(".name").value.trim();
-        const phrf = parseInt(row.querySelector(".phrf").value);
-        const elapsed = parseFloat(row.querySelector(".elapsed").value);
+        const [nameInput, phrfInput, timeInput] = row.querySelectorAll("input");
+        const name = nameInput.value;
+        const phrf = parseFloat(phrfInput.value);
+        const elapsed = parseFloat(timeInput.value);
+
         if (!name || isNaN(phrf) || isNaN(elapsed)) continue;
 
-        const adjusted = elapsed + (phrf * elapsed / 60 / 60); // simplified correction
-        boats.push({ name, phrf, elapsed, adjusted: adjusted.toFixed(2) });
+        const correctedTime = elapsed - (phrf * distance) / 60;
+        results.push({ name, phrf, elapsed, correctedTime });
       }
 
-      boats.sort((a, b) => a.adjusted - b.adjusted);
+      localStorage.setItem("raceResults", JSON.stringify(results));
+      document.getElementById("status").textContent = "Results saved locally.";
+    }
 
-      localStorage.setItem("raceResults", JSON.stringify(boats));
-
-      try {
-        const response = await fetch("/.netlify/functions/publish", {
-          method: "POST",
-          headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify(boats)
-        });
-
-        if (response.ok) {
-          alert("Race results published successfully.");
-        } else {
-          const err = await response.text();
-          alert("Error publishing: " + err);
-        }
-      } catch (err) {
-        console.error(err);
-        alert("Failed to publish results.");
+    async function publishResults() {
+      const data = localStorage.getItem("raceResults");
+      if (!data) {
+        alert("No results to publish.");
+        return;
       }
-    });
+
+      const res = await fetch("/.netlify/functions/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: data
+      });
+
+      const result = await res.text();
+      document.getElementById("status").textContent = "Publish response: " + result;
+    }
   </script>
 </body>
 </html>
